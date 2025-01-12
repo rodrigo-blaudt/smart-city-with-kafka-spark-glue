@@ -9,7 +9,7 @@ x-spark-common: &spark-common
     - spark-master
   environment:
     SPARK_MODE: Worker
-    SPARK_WORKER_CORES: 2
+    SPARK_WORKER_CORES: 1
     SPARK_WORKER_MEMORY: 1g
     SPARK_MASTER_URL: spark://spark-master:7077
   networks:
@@ -79,8 +79,63 @@ services:
       - datamasterylab
   spark-worker-1:
     <<: *spark-common
-  spark-worker-2:
-    <<: *spark-common
+  webserver:
+    image: apache/airflow:2.6.0-python3.9
+    command: webserver
+    entrypoint: ['/opt/airflow/script/entrypoint.sh']
+    depends_on:
+      - postgres
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=Sequential
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW_WEBSERVER_SECRET_KEY=secured_key
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      - datamasterylab
+
+  scheduler:
+    image: apache/airflow:2.6.0-python3.9
+    depends_on:
+      webserver:
+        condition: service_healthy
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=Sequential
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW_WEBSERVER_SECRET_KEY=secured_key
+    command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
+    networks:
+      - datamasterylab
+
+  postgres:
+    image: postgres:14.0
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - datamasterylab
 
 networks:
   datamasterylab:

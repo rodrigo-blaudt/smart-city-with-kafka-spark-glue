@@ -7,12 +7,12 @@ from confluent_kafka import SerializingProducer
 from datetime import datetime, timedelta
 
 
-LONDON_COORDINATES = {"latitude": 51.5074, "longitude": -0.1278}
-BIRMINGHAM_COORDINATES = {"latitude": 52.4862, "longitude": -1.8904}
+LONDON_COORDINATES = {"latitude": 51.5074, "longitude": 6.2018}
+BIRMINGHAM_COORDINATES = {"latitude": 53.4862, "longitude": 0.1230}
 
 # Calculate movement increments
-LATITUDE_INCREMENT = (BIRMINGHAM_COORDINATES['latitude'] - LONDON_COORDINATES['latitude']) / 100
-LONGITUDE_INCREMENT = (BIRMINGHAM_COORDINATES['longitude'] - LONDON_COORDINATES['longitude']) / 100
+LATITUDE_INCREMENT = (BIRMINGHAM_COORDINATES['latitude'] - LONDON_COORDINATES['latitude']) / 10
+LONGITUDE_INCREMENT = (BIRMINGHAM_COORDINATES['longitude'] - LONDON_COORDINATES['longitude']) / 10
 
 # Environment Variables
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
@@ -41,14 +41,15 @@ def simulate_vehicle_moviment():
     start_location['longitude'] += LONGITUDE_INCREMENT
 
     # add randomness to simulate road travel
-    start_location['latitude'] += random.uniform(-0.0005, 0.0005)
-    start_location['longitude'] += random.uniform(-0.0005, 0.0005)
+    start_location['latitude'] += random.uniform(0.1, 0.3)
+    start_location['longitude'] += random.uniform(0.1, 0.3)
 
     return start_location
 
 
 def generate_vehicle_data(device_id):
     location = simulate_vehicle_moviment()
+    print('location', location)
     return {
         'id': uuid.uuid4(),
         'deviceId': device_id,
@@ -161,7 +162,7 @@ def simulate_journey(producer, device_id):
         produce_data_to_kafka(producer, WEATHER_TOPIC, weather_data)
         produce_data_to_kafka(producer, EMERGENCY_TOPIC, emergency_incident_data)
 
-        time.sleep(5)
+        time.sleep(2)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+# jobs/spark-city.py
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType, IntegerType, DoubleType
@@ -78,12 +79,22 @@ def main():
         StructField('description', StringType(), True)
     ])
 
+    # User API schema
+    userApiSchema = StructType([
+        StructField('firstName', StringType(), True),
+        StructField('lastName', StringType(), True),
+        StructField('genderName', StringType(), True),
+        StructField('userName', StringType(), True),
+        StructField('timestamp', TimestampType(), True)
+    ])
+
     def read_kafka_topic(topic, schema):
         return (spark.readStream
                 .format('kafka')
                 .option('kafka.bootstrap.servers', 'broker:29092')
                 .option('subscribe', topic)
                 .option('startingOffsets', 'earliest')
+                .option("failOnDataLoss", "false")
                 .load()
                 .selectExpr('CAST(value AS STRING)')
                 .select(from_json(col('value'), schema).alias('data'))
@@ -103,17 +114,16 @@ def main():
     trafficDF = read_kafka_topic('traffic_data', trafficSchema).alias('traffic')
     weatherDF = read_kafka_topic('weather_data', weatherSchema).alias('weather')
     emergencyDF = read_kafka_topic('emergency_data', emergencySchema).alias('emergency')
-
-    # Join DFs with id and timestamp
-    # join
+    userApiDF = read_kafka_topic('api_data', userApiSchema).alias('api')
 
     query1 = streamWriter(vehicleDF, 's3a://smart-city-fb9f5426a5cf/checkpoints/vehicle_data', 's3a://smart-city-fb9f5426a5cf/data/vehicle_data')
     query2 = streamWriter(gpsDF, 's3a://smart-city-fb9f5426a5cf/checkpoints/gps_data', 's3a://smart-city-fb9f5426a5cf/data/gps_data')
     query3 = streamWriter(trafficDF, 's3a://smart-city-fb9f5426a5cf/checkpoints/traffic_data', 's3a://smart-city-fb9f5426a5cf/data/traffic_data')
     query4 = streamWriter(weatherDF, 's3a://smart-city-fb9f5426a5cf/checkpoints/weather_data', 's3a://smart-city-fb9f5426a5cf/data/weather_data')
     query5 = streamWriter(emergencyDF, 's3a://smart-city-fb9f5426a5cf/checkpoints/emergency_data', 's3a://smart-city-fb9f5426a5cf/data/emergency_data')
+    query6 = streamWriter(userApiDF, 's3a://smart-city-fb9f5426a5cf/checkpoints/user_api_data', 's3a://smart-city-fb9f5426a5cf/data/user_api_data')
 
-    query5.awaitTermination()
+    query6.awaitTermination()
 
 
 if __name__ == "__main__":
